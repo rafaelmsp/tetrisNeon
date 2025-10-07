@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Tetris Neon — Rafael Passos</title>
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;}
+        html,body{
+          width:100%;height:100%;overflow:hidden;
+          display:flex;justify-content:center;align-items:center;
+          background:#0a0a1f; /* Fundo base escuro */
+          font-family:'Courier New',monospace;color:#fff;
+        }
+
+        /* === Fundo animado com partículas === */
+        canvas#bg {
+          position: fixed;
+          top: 0; left: 0;
+          width: 100%; height: 100%;
+          z-index: 0;
+          background: radial-gradient(circle at center, #1a1a3f 0%, #0f0c29 60%, #0a0a1f 100%);
+          animation: bgshift 20s ease infinite;
+        }
+
+        @keyframes bgshift {
+          0% { filter: hue-rotate(0deg); }
+          50% { filter: hue-rotate(60deg); }
+          100% { filter: hue-rotate(0deg); }
+        }
+
+        .container {
+          position: relative;
+          z-index: 2;
+          display:flex;flex-direction:column;align-items:center;justify-content:center;
+          width:100%;max-width:380px;height:100%;padding:5px;
+          opacity: 0;
+          transition: opacity 1.2s ease;
+        }
+
+        .container.mostrar { opacity: 1; }
+        .container.ocultar { opacity: 0; }
+
+        .titulo{
+          font-size:1.8rem;
+          background:linear-gradient(45deg,#00ffff,#ff00ff,#00ff88);
+          -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+          text-shadow:0 0 20px #00ffff;margin:2px 0;
+        }
+
+        .preview-container{display:flex;flex-direction:column;align-items:center;margin-bottom:6px;}
+        #canvasPreview{border:2px solid #ff00ff;border-radius:8px;background:#000;box-shadow:0 0 15px #ff00ff;width:90px;height:90px;}
+        .preview-title{color:#ff00ff;font-size:1rem;margin-bottom:3px;text-shadow:0 0 10px #ff00ff;}
+        .painel-ui{display:flex;justify-content:space-between;width:80%;max-width:300px;font-size:1rem;margin-bottom:5px;}
+        .item-ui{background:rgba(0,0,0,0.5);padding:4px 6px;border-radius:5px;border:1px solid #00ffff;box-shadow:0 0 8px rgba(0,255,255,0.3);text-align:center;min-width:90px;}
+        #canvasJogo{border:3px solid #00ffff;border-radius:10px;box-shadow:0 0 20px #00ffff;background:#000;width:270px;height:480px;}
+        #controls{display:flex;justify-content:center;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px;max-width:300px;}
+        .btn{background:linear-gradient(45deg,#00ffff,#ff00ff);color:#000;border:none;border-radius:10px;padding:12px 20px;font-size:1.3rem;font-weight:bold;box-shadow:0 0 10px #00ffff;min-width:65px;text-align:center;}
+        .btn:active{transform:scale(0.9);}
+        .telaStart,.telaGameOver{
+          position:absolute;top:0;left:0;width:100%;height:100%;
+          background:rgba(10,10,25,0.95);display:flex;flex-direction:column;
+          align-items:center;justify-content:center;text-align:center;color:#00ffff;
+          padding:20px;z-index:3;opacity:1;transition:opacity 1s ease;
+        }
+        .telaStart.ocultar,.telaGameOver.ocultar{opacity:0;pointer-events:none;}
+        .telaStart h2,.telaGameOver h2{font-size:2rem;margin-bottom:15px;text-shadow:0 0 20px #00ffff;}
+        .botao{background:linear-gradient(45deg,#00ffff,#ff00ff);border:none;padding:12px 25px;font-size:1.1rem;font-weight:bold;border-radius:10px;color:#000;cursor:pointer;transition:.3s;margin-top:10px;}
+        .botao:hover{transform:scale(1.05);box-shadow:0 0 20px #00ffff;}
+    </style>
+</head>
+<body>
+
+<canvas id="bg"></canvas> <!-- 🌌 Fundo com partículas -->
+
+<!-- 🎵 Áudios -->
+<audio id="music" loop><source src="music.mp3" type="audio/mpeg"></audio>
+<audio id="somClick"><source src="click.mp3" type="audio/mpeg"></audio>
+<audio id="somGameOver"><source src="gameover.mp3" type="audio/mpeg"></audio>
+<audio id="somPress"><source src="press.mp3" type="audio/mpeg"></audio>
+<audio id="somPress2"><source src="press2.mp3" type="audio/mpeg"></audio>
+<audio id="somPress3"><source src="press3.mp3" type="audio/mpeg"></audio>
+<audio id="somLine"><source src="line.mp3" type="audio/mpeg"></audio>
+<audio id="somLevelUp"><source src="levelup.mp3" type="audio/mpeg"></audio>
+
+<div class="container" id="mainContainer">
+    <h1 class="titulo">TETRIS NEON</h1>
+
+    <div class="preview-container">
+        <div class="preview-title">🔮 Próxima Peça</div>
+        <canvas id="canvasPreview" width="100" height="100"></canvas>
+            </div>
+    <div class="painel-ui">
+        <div class="item-ui"><div>Score</div><div id="pontuacao">0</div></div>
+        <div class="item-ui"><div>Nível</div><div id="nivel">1</div></div>
+    </div>
+    <canvas id="canvasJogo" width="300" height="600"></canvas>
+    <div id="controls">
+        <button class="btn" id="esquerda">⬅️</button>
+        <button class="btn" id="girar">🔄</button>
+        <button class="btn" id="direita">➡️</button>
+        <button class="btn" id="baixo">⬇️</button>
+
+    </div>
+    <button id="botaoSom" class="botao">🔇 Parar Música</button>
+</div>
+
+<!-- Telas -->
+<div id="telaStart" class="telaStart">
+    <h2>Bem-vindo ao Tetris Neon!</h2>
+    <p>🎮 Complete linhas para marcar pontos e subir de nível!</p><br>
+    ⬅️ Esquerda<br>🔄 Girar<br>➡️ Direita<br>⬇️ Descer rápido<br><br>
+    <br><br><br>
+    <button id="botaoIniciar" class="botao">▶️ Iniciar Jogo</button>
+    <br>
+    <br>
+    <br>
+    <br>
+<br><br><br><br><br><br><br><br><br><br><br>
+    <p>🎮 Desenvolvido por Rafael Passos - RPDev @copyright</p>
+</div>
+
+
+<div id="telaGameOver" class="telaGameOver ocultar">
+    <h2>💀 GAME OVER 💀</h2>
+    <p>Pontuação final: <span id="pontuacaoFinal">0</span></p>
+    <button id="botaoReiniciar" class="botao">🔁 Jogar Novamente</button>
+</div>
+
+<script>
+    // 🎆 Fundo com partículas neon
+    const bgCanvas = document.getElementById('bg');
+    const bgCtx = bgCanvas.getContext('2d');
+    let particles = [];
+
+    function resizeBg() {
+      bgCanvas.width = window.innerWidth;
+      bgCanvas.height = window.innerHeight;
+    }
+    window.addEventListener('resize', resizeBg);
+    resizeBg();
+
+    for(let i=0;i<80;i++){
+      particles.push({
+        x:Math.random()*bgCanvas.width,
+        y:Math.random()*bgCanvas.height,
+        r:Math.random()*2+1,
+        c:['#00ffff','#ff00ff','#00ff88'][Math.floor(Math.random()*3)],
+        v:(Math.random()*0.5)+0.2
+      });
+    }
+
+    function drawBg(){
+      bgCtx.clearRect(0,0,bgCanvas.width,bgCanvas.height);
+      for(let p of particles){
+        bgCtx.beginPath();
+        bgCtx.arc(p.x,p.y,p.r,0,2*Math.PI);
+        bgCtx.fillStyle=p.c;
+        bgCtx.shadowColor=p.c;
+        bgCtx.shadowBlur=8;
+        bgCtx.fill();
+        p.y -= p.v;
+        if(p.y<0) p.y = bgCanvas.height;
+      }
+      requestAnimationFrame(drawBg);
+    }
+    drawBg();
+</script>
+
+<script>
+    const musica=document.getElementById('music'),
+    somClick=document.getElementById('somClick'),
+    somGameOver=document.getElementById('somGameOver'),
+    somPress=document.getElementById('somPress'),
+    somPress2=document.getElementById('somPress2'),
+    somPress3=document.getElementById('somPress3'),
+    somLine=document.getElementById('somLine'),
+    somLevelUp=document.getElementById('somLevelUp');
+
+    musica.volume=0.4;somClick.volume=0.7;somGameOver.volume=0.8;
+    somPress.volume=0.6;somPress2.volume=0.7;somPress3.volume=0.7;
+    somLine.volume=0.9;somLevelUp.volume=0.8;
+
+    function tocar(a){a.currentTime=0;a.play();}
+</script>
+
+<script>
+    // === LÓGICA DO JOGO ===
+    const COLS=10,ROWS=20,SIZE=30;
+    const COLORS=['#00ffff','#ff00ff','#00ff88','#ff9900','#ff3333','#0099ff','#ffff00','#cc00ff'];
+    const SHAPES={
+      I:[[[0,1],[1,1],[2,1],[3,1]],[[2,0],[2,1],[2,2],[2,3]]],
+      O:[[[1,0],[2,0],[1,1],[2,1]]],
+      T:[[[1,0],[0,1],[1,1],[2,1]],[[1,0],[1,1],[1,2],[2,1]],[[0,1],[1,1],[2,1],[1,2]],[[1,0],[0,1],[1,1],[1,2]]],
+      S:[[[1,0],[2,0],[0,1],[1,1]],[[1,0],[1,1],[2,1],[2,2]]],
+      Z:[[[0,0],[1,0],[1,1],[2,1]],[[2,0],[1,1],[2,1],[1,2]]],
+      J:[[[0,0],[0,1],[1,1],[2,1]],[[1,0],[2,0],[1,1],[1,2]],[[0,1],[1,1],[2,1],[2,2]],[[1,0],[0,2],[1,1],[1,2]]],
+      L:[[[2,0],[0,1],[1,1],[2,1]],[[1,0],[1,1],[1,2],[2,2]],[[0,1],[1,1],[2,1],[0,2]],[[0,0],[1,0],[1,1],[1,2]]]
+    };
+    let paused = false;
+
+
+    let canvas=document.getElementById('canvasJogo'),ctx=canvas.getContext('2d');
+    let preview=document.getElementById('canvasPreview'),ctxPrev=preview.getContext('2d');
+    let board,current,nextPiece;let score=0,level=1,dropStart=0,dropInterval=800,running=false;
+    let explosions=[];
+
+    class Piece{
+      constructor(t){this.type=t;this.rot=0;this.x=3;this.y=0;this.color=COLORS[Math.floor(Math.random()*COLORS.length)];}
+      get shape(){return SHAPES[this.type][this.rot];}
+      draw(){for(const[dX,dY]of this.shape)drawBlock(this.x+dX,this.y+dY,this.color);}
+      collides(dx=0,dy=0,rot=this.rot){
+        for(const[a,b]of SHAPES[this.type][rot]){
+          const nx=this.x+a+dx,ny=this.y+b+dy;
+          if(nx<0||nx>=COLS||ny>=ROWS||(board[ny]&&board[ny][nx]))return true;
+        }return false;
+      }
+      lock(){
+        for(const[dX,dY]of this.shape){
+          if(this.y+dY<0)return gameOver();
+          board[this.y+dY][this.x+dX]=this.color;
+        }clearLines();newPiece();
+      }
+    }
+
+    function drawBlock(x,y,c){ctx.fillStyle=c;ctx.fillRect(x*SIZE,y*SIZE,SIZE,SIZE);ctx.strokeStyle='rgba(255,255,255,0.5)';ctx.strokeRect(x*SIZE,y*SIZE,SIZE,SIZE);}
+    function drawExplosion(x,y,t){const a=1-(Date.now()-t)/300;if(a<=0)return;ctx.beginPath();ctx.arc(x*SIZE+SIZE/2,y*SIZE+SIZE/2,SIZE*1.2,0,Math.PI*2);ctx.fillStyle=`rgba(255,255,255,${a})`;ctx.fill();}
+    function drawBoard(){ctx.fillStyle="#000";ctx.fillRect(0,0,canvas.width,canvas.height);for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++)if(board[y][x])drawBlock(x,y,board[y][x]);explosions.forEach(e=>drawExplosion(e.x,e.y,e.time));}
+
+   function clearLines() {
+  for (let y = ROWS - 1; y >= 0; y--) {
+    if (board[y].every(v => v)) {
+      tocar(somLine);
+      for (let x = 0; x < COLS; x++) explosions.push({ x, y, time: Date.now() });
+      board.splice(y, 1);
+      board.unshift(Array(COLS).fill(0));
+      score += 100;
+      updateUI();
+      y++;
+    }
+  }
+
+  // 🧮 Sistema de Level a cada 1000 pontos
+  const novoNivel = Math.floor(score / 1000) + 1;
+  if (novoNivel > level) {
+    level = novoNivel;
+    dropInterval = Math.max(150, dropInterval - 80);
+    tocar(somLevelUp);
+    updateUI();
+    levelUpEfeito();
+  }
+}
+
+// ✨ Efeito visual de subida de nível
+function levelUpEfeito() {
+  // Flash neon no contorno do jogo
+  canvas.style.transition = "box-shadow 0.2s ease";
+  canvas.style.boxShadow = "0 0 40px 20px #00ffff";
+  setTimeout(() => {
+    canvas.style.boxShadow = "0 0 20px 5px #00ffff";
+  }, 600);
+
+  // Texto flutuante
+  const texto = document.createElement("div");
+  texto.textContent = `LEVEL ${level}!`;
+  texto.style.position = "absolute";
+  texto.style.top = "50%";
+  texto.style.left = "50%";
+  texto.style.transform = "translate(-50%, -50%)";
+  texto.style.fontSize = "2rem";
+  texto.style.fontWeight = "bold";
+  texto.style.color = "#00ffff";
+  texto.style.textShadow = "0 0 20px #ff00ff, 0 0 30px #00ffff";
+  texto.style.zIndex = 5;
+  texto.style.opacity = 1;
+  texto.style.transition = "all 1.5s ease";
+  document.body.appendChild(texto);
+
+  setTimeout(() => {
+    texto.style.opacity = 0;
+    texto.style.transform = "translate(-50%, -70%) scale(1.3)";
+  }, 100);
+
+  setTimeout(() => {
+    texto.remove();
+  }, 1500);
+
+  // Partículas coloridas
+  for (let i = 0; i < 40; i++) {
+    const px = Math.random() * canvas.width;
+    const py = Math.random() * canvas.height / 2 + canvas.height / 4;
+    explosions.push({ x: px / SIZE, y: py / SIZE, time: Date.now(), color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+  }
+}
+
+
+    function newPiece(){
+      const types=Object.keys(SHAPES);
+      if(!nextPiece)nextPiece=new Piece(types[Math.floor(Math.random()*types.length)]);
+      current=nextPiece;nextPiece=new Piece(types[Math.floor(Math.random()*types.length)]);
+      drawPreview();if(current.collides())gameOver();
+    }
+
+    function drawPreview(){ctxPrev.fillStyle="#000";ctxPrev.fillRect(0,0,preview.width,preview.height);
+      for(const[dX,dY]of nextPiece.shape){ctxPrev.fillStyle=nextPiece.color;ctxPrev.fillRect(dX*25,dY*25,25,25);ctxPrev.strokeStyle='rgba(255,255,255,0.5)';ctxPrev.strokeRect(dX*25,dY*25,25,25);}}
+    function updateUI(){document.getElementById('pontuacao').textContent=score;document.getElementById('nivel').textContent=level;}
+
+    function moveLeft(){if(!current.collides(-1,0)){current.x--;tocar(somPress);}}
+    function moveRight(){if(!current.collides(1,0)){current.x++;tocar(somPress);}}
+    function moveDown(){while(!current.collides(0,1))current.y++;current.lock();tocar(somPress2);}
+    function rotate(){const n=(current.rot+1)%SHAPES[current.type].length;if(!current.collides(0,0,n)){current.rot=n;tocar(somPress3);}}
+
+    document.getElementById('esquerda').onclick=()=>moveLeft();
+    document.getElementById('direita').onclick=()=>moveRight();
+    document.getElementById('baixo').onclick=()=>moveDown();
+    document.getElementById('girar').onclick=()=>rotate();
+
+    document.addEventListener('keydown',e=>{
+      if(!running)return;
+      if(e.key==="ArrowLeft")moveLeft();
+      if(e.key==="ArrowRight")moveRight();
+      if(e.key==="ArrowDown")moveDown();
+      if(e.key==="ArrowUp")rotate();
+    });
+
+    function drop(){
+      if(!running)return;
+      const now=Date.now();
+      explosions=explosions.filter(e=>Date.now()-e.time<300);
+      if(now-dropStart>dropInterval){
+        current.y++;
+        if(current.collides(0,0)){current.y--;current.lock();}
+        dropStart=now;
+      }
+      drawBoard();current.draw();
+      requestAnimationFrame(drop);
+    }
+
+    function gameOver(){
+      running=false;
+      tocar(somGameOver);
+      document.getElementById('pontuacaoFinal').textContent=score;
+      const over=document.getElementById('telaGameOver');
+      over.classList.remove('ocultar');
+      setTimeout(()=>{document.getElementById('mainContainer').classList.remove('mostrar');},200);
+    }
+
+    document.getElementById('botaoIniciar').onclick=()=>{
+      tocar(somClick);
+      const tela=document.getElementById('telaStart');
+      tela.classList.add('ocultar');
+      const main=document.getElementById('mainContainer');
+      main.classList.add('mostrar');
+      setTimeout(()=>{
+        board=Array.from({length:ROWS},()=>Array(COLS).fill(0));
+        score=0;level=1;dropInterval=800;explosions=[];
+        updateUI();running=true;
+        tocar(musica);
+        nextPiece=null;newPiece();drop();
+      },800);
+    };
+
+    document.getElementById('botaoReiniciar').onclick=()=>{
+      document.getElementById('telaGameOver').classList.add('ocultar');
+      document.getElementById('telaStart').classList.remove('ocultar');
+    };
+</script>
+<script>
+    const botaoSom = document.getElementById('botaoSom');
+    let musicaAtiva = true;
+
+    // Funções de controle da música
+    function tocarMusica() {
+      try {
+        musica.play();
+        musica.loop = true;
+      } catch (e) {
+        console.log('Erro ao tocar música:', e);
+      }
+    }
+
+    function pararMusica() {
+      musica.pause();
+      musica.currentTime = 0;
+    }
+
+    botaoSom.onclick = () => {
+      if (musicaAtiva) {
+        pararMusica();
+        botaoSom.textContent = "🔊 Tocar Música";
+      } else {
+        tocarMusica();
+        botaoSom.textContent = "🔇 Parar Música";
+      }
+      musicaAtiva = !musicaAtiva;
+    };
+</script>
+
+
+<!-- ✨ Partículas neon da tela inicial -->
+<canvas id="particlesStart"></canvas>
+<script>
+    const telaStartEl = document.getElementById("telaStart");
+    const canvasStart = document.getElementById("particlesStart");
+    const ctxStart = canvasStart.getContext("2d");
+
+    let startParticles = [];
+    let mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+
+    // Ajusta tamanho
+    function resizeStart() {
+      canvasStart.width = window.innerWidth;
+      canvasStart.height = window.innerHeight;
+    }
+    window.addEventListener("resize", resizeStart);
+    resizeStart();
+
+    // Cria partículas iniciais
+    for (let i = 0; i < 80; i++) {
+      startParticles.push({
+        x: Math.random() * canvasStart.width,
+        y: Math.random() * canvasStart.height,
+        r: Math.random() * 2 + 1,
+        a: Math.random() * 360,
+        s: Math.random() * 0.8 + 0.3,
+        c: ["#00ffff", "#ff00ff", "#00ff88"][Math.floor(Math.random() * 3)],
+      });
+    }
+
+    // Animação neon
+    function drawStartParticles() {
+      ctxStart.clearRect(0, 0, canvasStart.width, canvasStart.height);
+      startParticles.forEach((p) => {
+        const dx = (mouse.x - p.x) * 0.0005;
+        const dy = (mouse.y - p.y) * 0.0005;
+        p.x += Math.cos(p.a) * p.s + dx;
+        p.y += Math.sin(p.a) * p.s + dy;
+        p.a += 0.02;
+
+        // rebote nas bordas
+        if (p.x < 0) p.x = canvasStart.width;
+        if (p.x > canvasStart.width) p.x = 0;
+        if (p.y < 0) p.y = canvasStart.height;
+        if (p.y > canvasStart.height) p.y = 0;
+
+        // brilho neon
+        ctxStart.beginPath();
+        const g = ctxStart.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r * 5);
+        g.addColorStop(0, p.c);
+        g.addColorStop(1, "transparent");
+        ctxStart.fillStyle = g;
+        ctxStart.fillRect(p.x - p.r, p.y - p.r, p.r * 2, p.r * 2);
+      });
+      requestAnimationFrame(drawStartParticles);
+    }
+    drawStartParticles();
+
+    // Interatividade leve
+    window.addEventListener("mousemove", (e) => (mouse = { x: e.clientX, y: e.clientY }));
+    window.addEventListener("touchmove", (e) => {
+      if (e.touches[0]) mouse = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    });
+
+    // Fade-out suave das partículas ao iniciar o jogo
+    const botaoIniciarPart = document.getElementById("botaoIniciar");
+    botaoIniciarPart.addEventListener("click", () => {
+      canvasStart.style.transition = "opacity 1s ease";
+      canvasStart.style.opacity = "0";
+      setTimeout(() => {
+        canvasStart.remove(); // remove da tela após fade
+      }, 1200);
+    });
+</script>
+<div id="telaPause" class="telaGameOver ocultar">
+    <h2>⏸️ JOGO PAUSADO</h2>
+    <button id="botaoContinuar" class="botao">▶️ Continuar</button>
+</div>
+
+
+</body>
+</html>
