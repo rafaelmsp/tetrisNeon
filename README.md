@@ -51,17 +51,7 @@ webView.loadUrl("file:///android_asset/index.html");</code></pre>
 
   <hr>
 
-  <h2>💰 Monetização</h2>
-  <pre><code>&lt;script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"&gt;&lt;/script&gt;
-&lt;ins class="adsbygoogle"
-     style="display:block"
-     data-ad-client="ca-pub-XXXXXXXXXXXX"
-     data-ad-slot="YYYYYYYYYYYY"
-     data-ad-format="auto"
-     data-full-width-responsive="true"&gt;&lt;/ins&gt;
-&lt;script&gt;(adsbygoogle = window.adsbygoogle || []).push({});&lt;/script&gt;</code></pre>
-  <p>Substitua pelos seus IDs do Google AdMob.  
-  Exiba os anúncios entre partidas ou na tela de <b>Game Over</b>.</p>
+  
 
   <hr>
 
